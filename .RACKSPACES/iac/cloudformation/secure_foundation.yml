@@ -1,0 +1,125 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Secure AWS foundation with KMS, CloudTrail, Config, and encrypted S3.
+
+Parameters:
+  Project:
+    Type: String
+    Default: rackspace-secure
+  TrailBucketName:
+    Type: String
+    Default: rackspace-secure-cloudtrail-logs
+
+Resources:
+  KmsKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub "${Project} CMK"
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowRoot
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: "kms:*"
+            Resource: "*"
+
+  TrailBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref TrailBucketName
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref KmsKey
+
+  TrailBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TrailBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AWSCloudTrailAclCheck
+            Effect: Allow
+            Principal: { Service: cloudtrail.amazonaws.com }
+            Action: s3:GetBucketAcl
+            Resource: !Sub arn:aws:s3:::${TrailBucketName}
+          - Sid: AWSCloudTrailWrite
+            Effect: Allow
+            Principal: { Service: cloudtrail.amazonaws.com }
+            Action: s3:PutObject
+            Resource: !Sub arn:aws:s3:::${TrailBucketName}/AWSLogs/${AWS::AccountId}/*
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+
+  Trail:
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      TrailName: !Sub "${Project}-trail"
+      S3BucketName: !Ref TrailBucket
+      IsLogging: true
+      IsMultiRegionTrail: true
+      EnableLogFileValidation: true
+      IncludeGlobalServiceEvents: true
+    DependsOn:
+      - TrailBucketPolicy
+
+  ConfigRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${Project}-config-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: config.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSConfigRole
+
+  ConfigRecorder:
+    Type: AWS::Config::ConfigurationRecorder
+    Properties:
+      Name: !Sub "${Project}-recorder"
+      RoleARN: !GetAtt ConfigRole.Arn
+      RecordingGroup:
+        AllSupported: true
+        IncludeGlobalResourceTypes: true
+
+  ConfigDelivery:
+    Type: AWS::Config::DeliveryChannel
+    Properties:
+      Name: !Sub "${Project}-channel"
+      S3BucketName: !Ref TrailBucket
+    DependsOn:
+      - ConfigRecorder
+
+  ConfigStatus:
+    Type: AWS::Config::ConfigurationRecorderStatus
+    Properties:
+      Name: !Ref ConfigRecorder
+      IsEnabled: true
+
+  S3PublicReadProhibited:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: s3-bucket-public-read-prohibited
+      Source:
+        Owner: AWS
+        SourceIdentifier: S3_BUCKET_PUBLIC_READ_PROHIBITED
+
+Outputs:
+  TrailName:
+    Value: !Ref Trail
+  TrailBucket:
+    Value: !Ref TrailBucket
+  KmsKeyId:
+    Value: !Ref KmsKey
+  ConfigRule:
+    Value: !Ref S3PublicReadProhibited

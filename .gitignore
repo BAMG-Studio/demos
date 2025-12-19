@@ -1,73 +1,30 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Terraform
+# Terraform & Terragrunt
 .terraform/
 *.tfstate
-*.tfstate.*
-*.tfvars
-!terraform.tfvars.example
-.terraform.lock.hcl
-crash.log
+*.tfstate.backup
 override.tf
 override.tf.json
 *_override.tf
-*_override.tf.json
+.terraform.lock.hcl
+.terraform.d/
+.terragrunt-cache/
 
-# IDE
+# Secrets / creds
+*.pem
+*.key
+*.crt
+credentials
+.env
+
+# OS / editors
+.DS_Store
+*.swp
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-.DS_Store
 
-# Environment
-.env
-.env.local
-.env.*.local
-
-# AWS
-.aws/
-aws_credentials
-
-# Logs
+# Ignore backup and binary files
+*.bak
 *.log
-logs/
 
-# Test coverage
-.coverage
-htmlcov/
-.pytest_cache/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Project specific
-evidence/
-*.screenshot
-*.png
-*.jpg
+# Optional: keep modules and terragrunt config
+# (we want these tracked)
