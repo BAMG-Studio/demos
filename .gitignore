@@ -28,3 +28,4 @@ credentials
 
 # Optional: keep modules and terragrunt config
 # (we want these tracked)
+_archived_files/
