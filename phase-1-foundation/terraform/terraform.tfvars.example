@@ -1,0 +1,15 @@
+aws_region   = "us-east-1"
+project_name = "rackspace-soc"
+environment  = "prod"
+
+enable_cloudtrail = true
+enable_config     = true
+
+log_retention_days = 90
+
+tags = {
+  Project     = "rackspace-soc"
+  Environment = "prod"
+  ManagedBy   = "terraform"
+  CostCenter  = "security"
+}
