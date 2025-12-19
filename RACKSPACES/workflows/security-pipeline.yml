@@ -1,0 +1,65 @@
+name: Security Scanning Pipeline
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  secret-scanning:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secret scanning (gitleaks)
+        uses: zricethezav/gitleaks-action@v2.10.3
+
+  sast-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SAST (semgrep)
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: "p/owasp-top-ten"
+
+  dependency-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SCA (npm/yarn/pip via snyk)
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: test
+        if: ${{ env.SNYK_TOKEN != '' }}
+
+  iac-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: IaC scan (Checkov)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .RACKSPACES/iac/terraform
+
+  container-image-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: |
+          docker build -t demo-image:latest .RACKSPACES/demo-app
+      - name: Scan image (Trivy)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: demo-image:latest
+          severity: CRITICAL,HIGH
+
+  policy-gate:
+    needs: [secret-scanning, sast-scan, dependency-scan, iac-security, container-image-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Gate merge if previous jobs failed
+        run: |
+          echo "Security gates enforced via job dependencies"
